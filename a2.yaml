@@ -1,0 +1,8 @@
+ID: 2
+Name: rest room
+Length: 3
+Width: 3
+Desc: a small empty room
+Exits:
+  - Direction: south
+    Room: 1

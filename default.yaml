@@ -1,0 +1,27 @@
+ID: 1
+Name: default room
+Length: 3
+Width: 3
+Desc: an empty room
+Items:
+  Apple:
+    Kind: Food
+    Name: Apple
+    DisplayName: 苹果
+    Desc: a red juicy apple,looks tasty
+    RespawnTick: 1000
+    RespawnCount: 5
+    RespawnMax: 20
+    Nutrition: 20
+    Count: 2
+  Orange:
+    Kind: Food
+    Name: Orange
+    DisplayName: 桔子
+    Desc: a green organe,looks sour
+    RespawnTick: 50
+    Nutrition: 10
+    Count: 10
+Exits:
+  - Direction: north
+    Room: 2

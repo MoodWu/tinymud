@@ -1,0 +1,10 @@
+Kind: Food
+Name: Food
+DispalyName: 食物
+Desc: 一个普通的食物
+Respawn: 0
+Capabilities：
+  - Eatable
+  - CanGet
+  - CanDrop
+  - CanRespawn
