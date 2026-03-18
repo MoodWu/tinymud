@@ -49,7 +49,7 @@ func NewConnection(conn net.Conn) ProtocolConn {
 	tc := &TelnetConn{
 		raw:    conn,
 		reader: bufio.NewReader(conn),
-		cmd : make(chan string),
+		cmd : make(chan string,32),
 	}
 
 	tc.echo = 1

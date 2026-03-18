@@ -54,7 +54,7 @@ func (r *Room ) Run(){
 	select{
 	case cmd := <- r.Commands :
 		slog.Debug("room receive command","command",cmd.Raw)
-		go r.HandleCommand(cmd)
+		r.HandleCommand(cmd)
 	case p:= <- r.Arrival :
 		slog.Debug("New man arrive","player",p.NickName)
 		r.Enter(p)

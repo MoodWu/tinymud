@@ -10,7 +10,7 @@ import(
 	"io"
 	//"errors"
 	//"strings"
-	//"context"
+	"context"
 	"sync"
 	"time"
 )
@@ -25,12 +25,17 @@ type ProtocolConn interface {
     TerminalSize() (width, height int)
 }
 
+type World struct{
+	Commands chan *Command
+}
+
 var defaultRoom *Room
 var CommandMap map[string]CommandFunc
 var Rooms []*Room
 var RoomMap map[string]*Room
 var globalTick chan struct{}
 var mutex sync.RWMutex
+var world World
 
 func main(){
     opts := &slog.HandlerOptions{Level: slog.LevelDebug}
@@ -134,5 +139,35 @@ func StartTick() {
 		}
 	}()
 
+
+}
+
+func (w *World) Run(){
+	for {
+		select{
+		case cmd := <-w.Commands:
+			HandleCommand(cmd)
+		}
+	}
+} 
+
+func HandleCommand(cmd *Command){
+	slog.Debug("handle command:","cmd",fmt.Sprintf("%#v",cmd))
+	//parse command
+	//Check command route
+	player := cmd.Player
+	worker,ok := CommandMap[cmd.Verb]
+	if ok{
+		slog.Debug("call worker")
+		worker(context.Background(),cmd)
+		slog.Debug("end call worker")
+		return
+	}
+	//the command is not in the list,send directly to room ,to see if it's a script command
+	if player.Room != nil {
+		slog.Debug("Send to room")
+		player.Room.Commands <- cmd
+	}
+	slog.Debug("Unknown commnad send directly to room")
 
 }

@@ -22,7 +22,7 @@ type CommandResult struct{
 
 var Alias map[string]string
 
-type CommandFunc func(context context.Context, player *Player,cmd *Command) (error,CommandResult)
+type CommandFunc func(context context.Context,cmd *Command) (error,CommandResult)
 
 
 func (c *Command) Parse(value string){
@@ -43,10 +43,11 @@ func (c *Command) checkCmd(verb string) error {
 	return nil
 }
 
-func GoFunc (context context.Context, player *Player,cmd *Command) (error,CommandResult){
+func GoFunc (context context.Context, cmd *Command) (error,CommandResult){
 	if err:=cmd.checkCmd("go"); err != nil {
 		return err,CommandResult{}
 	}
+	player := cmd.Player
 	if player.Room == nil {
 		return nil,CommandResult{0,"you can't walk in void space"}
 	}
@@ -57,10 +58,11 @@ func GoFunc (context context.Context, player *Player,cmd *Command) (error,Comman
 	return nil ,CommandResult{}
 }
 
-func LookFunc (context context.Context, player *Player,cmd *Command) (error,CommandResult){
+func LookFunc (context context.Context, cmd *Command) (error,CommandResult){
 	if err := cmd.checkCmd("look");err != nil{
 		return err,CommandResult{}
 	}
+	player := cmd.Player
 	if player.Room == nil {
 		return nil,CommandResult{0,"you can't look in void space"}
 	}
@@ -70,10 +72,11 @@ func LookFunc (context context.Context, player *Player,cmd *Command) (error,Comm
 	return nil ,CommandResult{}
 }
 
-func GetFunc (context context.Context, player *Player,cmd *Command) (error,CommandResult){
+func GetFunc (context context.Context, cmd *Command) (error,CommandResult){
 	if err := cmd.checkCmd("get");err != nil{
 		return err,CommandResult{}
 	}
+	player := cmd.Player
 	itemName := cmd.Args
 	slog.Debug("GetFunc","itemName",itemName)
 	player.Room.Mutex.Lock()

@@ -1,10 +1,10 @@
 package main
 
 import(
-	"fmt"
+	// "fmt"
 	"log/slog"
 	"io"
-	"context"
+	// "context"
 	"sync"
 )
 
@@ -54,7 +54,7 @@ func (p *Player) Read(){
 		cmd := Command{}
 		cmd.Parse(str)
 		cmd.Player = p
-		p.Command <- &cmd
+		world.Commands <- &cmd
 		}
 
 	}()
@@ -73,23 +73,8 @@ func (p *Player) Run(){
 			slog.Debug("tiker singal")
 			p.OnTick()
 		case cmd := <- p.Command:
+			slog.Debug("player cmnd","cmd",cmd)
 			
-			slog.Debug("user command:","cmd",fmt.Sprintf("%#v",cmd))
-			//parse command
-			//Check command route
-			worker,ok := CommandMap[cmd.Verb]
-			if ok{
-				slog.Debug("call worker")
-			worker(context.Background(),p,cmd)
-			break
-			}
-			//the command is not in the list,send directly to room ,to see if it's a script command
-			if p.Room != nil {
-				slog.Debug("Send to room")
-				p.Room.Commands <- cmd
-			}
-			slog.Debug("Unknown commnad send directly to room")
-
 			//exeute
 		}
 	}
