@@ -98,19 +98,19 @@ func LoadMap(fileName string) {
 		}
 		roomID := viper.GetString("ID") */
 	room := Room{
-		ID:        rc.ID,
-		Name:      rc.Name,
-		Length:    rc.Length,
-		Width:     rc.Width,
-		Desc:      rc.Desc,
-		Exits:     make([]*Exit, 0),
-		Departure: make(chan *Player),
-		Arrival:   make(chan *Player),
-		Commands:  make(chan *Command, 10),
-		Ticker:    make(chan struct{}),
-		Tick:      1,
-		Items:     make(map[string]*Inventory),
-		respawn:   make(map[int]map[string]IRespawn),
+		ID:          rc.ID,
+		Name:        rc.Name,
+		Length:      rc.Length,
+		Width:       rc.Width,
+		Desc:        rc.Desc,
+		Exits:       make([]*Exit, 0),
+		Departure:   make(chan *Player),
+		Arrival:     make(chan *Player),
+		Commands:    make(chan *Command, 10),
+		Ticker:      make(chan struct{}),
+		Tick:        1,
+		Items:       make(map[string]*Inventory),
+		respawnHeap: make([]*RespawnEvent, 0),
 	}
 
 	for _, v := range rc.Exits {

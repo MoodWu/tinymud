@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -21,7 +22,15 @@ type Room struct {
 	Tick      int
 	Mutex     sync.RWMutex
 	Items     map[string]*Inventory
-	respawn   map[int]map[string]IRespawn
+	// respawn   map[int]map[string]IRespawn
+	respawnHeap []*RespawnEvent
+}
+
+type RespawnEvent struct {
+	Interval int
+	NextTick int
+	ItemName string
+	Event    IRespawn
 }
 
 type Inventory struct {
@@ -34,16 +43,45 @@ type Exit struct {
 	Room      string
 }
 
+func (r *Room) Len() int {
+	return len(r.respawnHeap)
+}
+
+func (r *Room) Less(i, j int) bool {
+	return r.respawnHeap[i].NextTick < r.respawnHeap[j].NextTick
+}
+
+func (r *Room) Swap(i, j int) {
+	r.respawnHeap[i], r.respawnHeap[j] = r.respawnHeap[j], r.respawnHeap[i]
+}
+
+func (r *Room) Push(x any) {
+	event := x.(*RespawnEvent)
+	r.respawnHeap = append(r.respawnHeap, event)
+}
+
+func (r *Room) Pop() any {
+	n := len(r.respawnHeap)
+	event := r.respawnHeap[n-1]
+	r.respawnHeap = r.respawnHeap[:n-1]
+	return event
+}
+
 func (r *Room) RegisterRespawnEvent(tick int, item string, ev IRespawn) {
 	//slog.Debug("RegisterRespawnEvent","tick",tick,"item",item)
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	_, ok := r.respawn[tick]
-	if !ok {
-		//slog.Debug("Register")
-		r.respawn[tick] = make(map[string]IRespawn, 0)
+
+	event := &RespawnEvent{
+		Interval: tick,
+		NextTick: r.Tick + tick,
+		ItemName: item,
+		Event:    ev,
 	}
-	r.respawn[tick][item] = ev
+
+	//add to respawn heap
+	heap.Push(r, event)
+
 	//slog.Debug("register respanw event","item",item)
 }
 
@@ -206,18 +244,15 @@ func (r *Room) OnTick() {
 	r.Mutex.Lock()
 	r.Tick++
 	tick := r.Tick
-	r.Mutex.Unlock()
 
-	//Respawn
-	for k, v := range r.respawn {
-		//slog.Debug("check respawn","TickCount",k)
-		if tick%k == 0 {
-			for _, f := range v {
-				//slog.Debug("ready to respawn","TickCount",k,"Tick",tick,"Item",f.GetRespawnID())
-				f.OnRespawn(r)
-			}
-		}
+	for len(r.respawnHeap) > 0 && r.respawnHeap[0].NextTick <= tick {
+		event := heap.Pop(r).(*RespawnEvent)
+		slog.Debug("Respawn event triggered", "item", event.ItemName, "tick", tick)
+		event.Event.OnRespawn(r)
+		event.NextTick = tick + event.Interval
+		heap.Push(r, event)
 	}
 
+	r.Mutex.Unlock()
 	//slog.Debug("room tick","room id",r.ID,"tick",tick)
 }
