@@ -48,7 +48,7 @@ func LoadMaps(ctx context.Context, dir string) {
 	for _, afile := range files {
 		LoadMap(ctx, afile)
 	}
-	defaultRoom = world.RoomMap["1"]
+	world.DefaultRoom = world.RoomMap["1"]
 }
 func LoadDir(dir string) []string {
 

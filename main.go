@@ -26,25 +26,35 @@ type ProtocolConn interface {
 }
 
 type World struct {
-	Commands chan *Command
-	RoomMap  map[string]*Room
-	Mutex    sync.RWMutex
+	Commands    chan *Command
+	RoomMap     map[string]*Room
+	Mutex       sync.RWMutex
+	DefaultRoom *Room
+	CommandMap  map[string]CommandFunc
+	GlobalTick  chan struct{}
 }
 
-var defaultRoom *Room
-var CommandMap map[string]CommandFunc
+// var defaultRoom *Room
+// var CommandMap map[string]CommandFunc
 
-// var RoomMap map[string]*Room
-var globalTick chan struct{}
-var world World
+// // var RoomMap map[string]*Room
+// var globalTick chan struct{}
+var world *World
 
+func NewWorld() *World {
+	return &World{
+		Commands:   make(chan *Command, 100),
+		RoomMap:    make(map[string]*Room, 0),
+		CommandMap: make(map[string]CommandFunc, 0),
+		GlobalTick: make(chan struct{}, 100),
+	}
+}
 func main() {
 	opts := &slog.HandlerOptions{Level: slog.LevelDebug}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, opts)))
 	slog.Info("Start MuD Service")
 
-	world.Commands = make(chan *Command, 100)
-	world.RoomMap = make(map[string]*Room, 0)
+	world = NewWorld()
 
 	globalContext, cancel := context.WithCancel(context.Background())
 
@@ -52,9 +62,9 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	globalTick = make(chan struct{})
 	//read map
 	LoadMaps(globalContext, ".")
+	RegisterCommands()
 	//start all protocol listenging
 	go StartTelnetServer(globalContext, ":4001")
 	//Start clock tick
@@ -125,7 +135,7 @@ func HandlePlayerInit(ctx context.Context, conn ProtocolConn) {
 	//check or save
 
 	//construct player object
-	NewPlayer(ctx, username, defaultRoom, conn)
+	NewPlayer(ctx, username, world.DefaultRoom, conn)
 
 }
 
@@ -142,7 +152,7 @@ func StartTick(ctx context.Context) {
 				return
 			case <-ticker.C:
 				select {
-				case globalTick <- struct{}{}:
+				case world.GlobalTick <- struct{}{}:
 				default:
 					slog.Debug("global tick channel is full, skip this tick")
 				}
@@ -156,9 +166,9 @@ func StartTick(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				slog.Debug("Tick handler stops")
-				close(globalTick)
+				close(world.GlobalTick)
 				return
-			case <-globalTick:
+			case <-world.GlobalTick:
 				world.Mutex.RLock()
 				//slog.Debug("Tick")
 				for _, r := range world.RoomMap {
@@ -187,7 +197,7 @@ func HandleCommand(ctx context.Context, cmd *Command) {
 	//parse command
 	//Check command route
 	player := cmd.Player
-	worker, ok := CommandMap[cmd.Verb]
+	worker, ok := world.CommandMap[cmd.Verb]
 	if ok {
 		slog.Debug("call worker")
 		worker(ctx, cmd)

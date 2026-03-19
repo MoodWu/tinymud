@@ -1,13 +1,9 @@
-//Register all command
+// Register all command
 package main
 
-func init(){
-	RegisterCommands()
-}
+func RegisterCommands() {
 
-func RegisterCommands(){
-	CommandMap = make(map[string]CommandFunc)
-	CommandMap["go"] = CommandFunc(GoFunc)
-	CommandMap["look"] = CommandFunc(LookFunc)
-	CommandMap["get"] = CommandFunc(GetFunc)
+	world.CommandMap["go"] = CommandFunc(GoFunc)
+	world.CommandMap["look"] = CommandFunc(LookFunc)
+	world.CommandMap["get"] = CommandFunc(GetFunc)
 }
