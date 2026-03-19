@@ -167,6 +167,9 @@ func (r *Room) Move(player *Player, dirction string) {
 }
 
 func (r *Room) Look(player *Player) {
+	r.Mutex.RLock()
+	defer r.Mutex.RUnlock()
+
 	ret := r.Desc
 	objects := ""
 	for i, v := range r.Items {
@@ -204,6 +207,8 @@ func (r *Room) Look(player *Player) {
 }
 
 func (r *Room) NotifyLeave(player *Player) {
+	r.Mutex.RLock()
+	defer r.Mutex.RUnlock()
 	for _, u := range r.Players {
 		if u.NickName == player.NickName {
 			continue
@@ -213,6 +218,9 @@ func (r *Room) NotifyLeave(player *Player) {
 }
 
 func (r *Room) NotifyEntry(player *Player) {
+	r.Mutex.RLock()
+	defer r.Mutex.RUnlock()
+
 	for _, u := range r.Players {
 		if u.NickName == player.NickName {
 			continue
@@ -222,13 +230,22 @@ func (r *Room) NotifyEntry(player *Player) {
 }
 
 func (r *Room) Enter(player *Player) {
+	player.Mutex.Lock()
 	player.Room = r
+	player.Mutex.Unlock()
+
+	r.Mutex.Lock()
 	r.Players = append(r.Players, player)
+	r.Mutex.Unlock()
+
 	r.NotifyEntry(player)
 	r.Look(player)
 }
 
 func (r *Room) Leave(player *Player) {
+	r.Mutex.RLock()
+	defer r.Mutex.RUnlock()
+
 	for i, u := range r.Players {
 		if u.NickName == player.NickName {
 			copy(r.Players[i:], r.Players[i+1:])
@@ -236,7 +253,11 @@ func (r *Room) Leave(player *Player) {
 			break
 		}
 	}
+
+	player.Mutex.Lock()
 	player.Room = nil
+	player.Mutex.Unlock()
+
 	r.NotifyLeave(player)
 }
 
