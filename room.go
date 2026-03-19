@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/heap"
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -85,10 +86,13 @@ func (r *Room) RegisterRespawnEvent(tick int, item string, ev IRespawn) {
 	//slog.Debug("register respanw event","item",item)
 }
 
-func (r *Room) Run() {
+func (r *Room) Run(ctx context.Context) {
 	slog.Debug("Room starts to run", "Room ID", r.ID)
 	for {
 		select {
+		case <-ctx.Done():
+			slog.Debug("Room stops", "Room ID", r.ID)
+			return
 		case cmd := <-r.Commands:
 			slog.Debug("room receive command", "command", cmd.Raw)
 			r.HandleCommand(cmd)

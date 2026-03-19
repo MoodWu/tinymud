@@ -28,16 +28,14 @@ type ProtocolConn interface {
 type World struct {
 	Commands chan *Command
 	RoomMap  map[string]*Room
-	Quit     chan struct{}
+	Mutex    sync.RWMutex
 }
 
 var defaultRoom *Room
 var CommandMap map[string]CommandFunc
-var Rooms []*Room
 
 // var RoomMap map[string]*Room
 var globalTick chan struct{}
-var mutex sync.RWMutex
 var world World
 
 func main() {
@@ -47,7 +45,8 @@ func main() {
 
 	world.Commands = make(chan *Command, 100)
 	world.RoomMap = make(map[string]*Room, 0)
-	world.Quit = make(chan struct{})
+
+	globalContext, cancel := context.WithCancel(context.Background())
 
 	// 监听系统信号
 	sigChan := make(chan os.Signal, 1)
@@ -55,37 +54,44 @@ func main() {
 
 	globalTick = make(chan struct{})
 	//read map
-	LoadMaps(".")
+	LoadMaps(globalContext, ".")
 	//start all protocol listenging
-	go StartTelnetServer(":4001")
+	go StartTelnetServer(globalContext, ":4001")
 	//Start clock tick
-	go StartTick()
+	go StartTick(globalContext)
 
 	// 等待信号
 	sig := <-sigChan
-	close(world.Quit)
+	cancel() // 取消全局上下文，通知所有 goroutine 停止
 	slog.Info(fmt.Sprintf("\n收到信号 %v，开始优雅退出...\n", sig))
 }
 
-func StartTelnetServer(address string) {
+func StartTelnetServer(ctx context.Context, address string) {
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
 		slog.Error("Telnet listen", " error ", err)
 		return
 	}
 	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			slog.Error("telnet accepth ", "error:", err)
-			continue
-		}
-		telnetConn := NewConnection(conn)
+		select {
+		case <-ctx.Done():
+			slog.Debug("Telnet server stops")
+			return
+		default:
 
-		go HandlePlayerInit(telnetConn)
+			conn, err := ln.Accept()
+			if err != nil {
+				slog.Error("telnet accepth ", "error:", err)
+				continue
+			}
+			telnetConn := NewConnection(conn)
+
+			go HandlePlayerInit(ctx, telnetConn)
+		}
 	}
 }
 
-func HandlePlayerInit(conn ProtocolConn) {
+func HandlePlayerInit(ctx context.Context, conn ProtocolConn) {
 	//ask for signin/signup
 	conn.WriteLine("Welcome to mini MUD")
 	conn.WriteLine("1)Sigin")
@@ -119,45 +125,64 @@ func HandlePlayerInit(conn ProtocolConn) {
 	//check or save
 
 	//construct player object
-	NewPlayer(username, defaultRoom, conn)
+	NewPlayer(ctx, username, defaultRoom, conn)
 
 }
 
-func StartTick() {
+func StartTick(ctx context.Context) {
 
 	go func() {
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
-		for range ticker.C {
-			globalTick <- struct{}{}
+
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Debug("Tick stops")
+				return
+			case <-ticker.C:
+				select {
+				case globalTick <- struct{}{}:
+				default:
+					slog.Debug("global tick channel is full, skip this tick")
+				}
+
+			}
 		}
 	}()
 
 	go func() {
-		for range globalTick {
-			mutex.RLock()
-			//slog.Debug("Tick")
-			for _, r := range world.RoomMap {
-				r.Ticker <- struct{}{}
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Debug("Tick handler stops")
+				close(globalTick)
+				return
+			case <-globalTick:
+				world.Mutex.RLock()
+				//slog.Debug("Tick")
+				for _, r := range world.RoomMap {
+					r.Ticker <- struct{}{}
+				}
+				world.Mutex.RUnlock()
 			}
-			mutex.RUnlock()
 		}
 	}()
 }
 
-func (w *World) Run() {
+func (w *World) Run(ctx context.Context) {
 	for {
 		select {
 		case cmd := <-w.Commands:
-			HandleCommand(cmd)
-		case <-w.Quit:
+			HandleCommand(ctx, cmd)
+		case <-ctx.Done():
 			slog.Info("Received quit signal, shutting down...")
 			return
 		}
 	}
 }
 
-func HandleCommand(cmd *Command) {
+func HandleCommand(ctx context.Context, cmd *Command) {
 	slog.Debug("handle command:", "cmd", fmt.Sprintf("%#v", cmd))
 	//parse command
 	//Check command route
@@ -165,7 +190,7 @@ func HandleCommand(cmd *Command) {
 	worker, ok := CommandMap[cmd.Verb]
 	if ok {
 		slog.Debug("call worker")
-		worker(context.Background(), cmd)
+		worker(ctx, cmd)
 		slog.Debug("end call worker")
 		return
 	}

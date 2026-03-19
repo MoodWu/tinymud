@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -41,11 +42,11 @@ type RawExit struct {
 	Room      string `yaml:"Room"`
 }
 
-func LoadMaps(dir string) {
+func LoadMaps(ctx context.Context, dir string) {
 
 	files := LoadDir(dir)
 	for _, afile := range files {
-		LoadMap(afile)
+		LoadMap(ctx, afile)
 	}
 	defaultRoom = world.RoomMap["1"]
 }
@@ -69,7 +70,7 @@ func LoadDir(dir string) []string {
 	return files
 }
 
-func LoadMap(fileName string) {
+func LoadMap(ctx context.Context, fileName string) {
 	//slog.Debug("LoadMap","filename",fileName)
 	//read file
 	data, err := os.ReadFile(fileName)
@@ -140,5 +141,5 @@ func LoadMap(fileName string) {
 	}
 
 	world.RoomMap[rc.ID] = &room
-	go room.Run()
+	go room.Run(ctx)
 }

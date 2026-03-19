@@ -9,23 +9,27 @@ import (
 	"sync/atomic"
 )
 
-//telnet 命令小结
-//251~254（WILL/WONT/DO/DONT）
-//	固定再跟 1 字节 option 号，整包 3 字节。
-//250（SB）
-//	后面是不定长 payload，一直读到下一个 IAC SE（240） 才算完；payload 里出现 IAC IAC 表示字面量 0xFF，不做命令解析。
-//其余命令（236~249，除 250）
-//	后面不带任何额外数据，长度就是 2 字节。
+// telnet 命令小结
+// 251~254（WILL/WONT/DO/DONT）
 //
+//	固定再跟 1 字节 option 号，整包 3 字节。
+//
+// 250（SB）
+//
+//	后面是不定长 payload，一直读到下一个 IAC SE（240） 才算完；payload 里出现 IAC IAC 表示字面量 0xFF，不做命令解析。
+//
+// 其余命令（236~249，除 250）
+//
+//	后面不带任何额外数据，长度就是 2 字节。
 const (
-	IAC  = 255 // Telnet 命令开始
-	WILL = 251
-	WONT = 252
-	DO   = 253
-	DONT = 254
-	SB   = 250 // Subnegotiation Begin
-	SE   = 240 // Subnegotiation End
-	LINEMODE = 34 // 行模式选项
+	IAC      = 255 // Telnet 命令开始
+	WILL     = 251
+	WONT     = 252
+	DO       = 253
+	DONT     = 254
+	SB       = 250 // Subnegotiation Begin
+	SE       = 240 // Subnegotiation End
+	LINEMODE = 34  // 行模式选项
 )
 
 //2025-12-08 v0.1 丢弃掉所有的IAC命令
@@ -38,8 +42,8 @@ type TelnetConn struct {
 	width  int32
 	height int32
 	closed int32
-	err error
-	cmd chan string
+	err    error
+	cmd    chan string
 }
 
 type ch_CMD chan string
@@ -49,7 +53,11 @@ func NewConnection(conn net.Conn) ProtocolConn {
 	tc := &TelnetConn{
 		raw:    conn,
 		reader: bufio.NewReader(conn),
-		cmd : make(chan string,32),
+		cmd:    make(chan string, 32),
+	}
+	//make sure the connection is alive, if it's a tcp connection
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		tcpConn.SetKeepAlive(true)
 	}
 
 	tc.echo = 1
@@ -95,55 +103,55 @@ func (tc *TelnetConn) handleIAC() {
 	// 其他 WILL/DO 我们可以选择性响应
 }
 
-//读取网络传送来的命令，分开用户命令和IAC命令
-func (tc *TelnetConn) startReading(){
-	for{
-	//从连接中读取信息，直到收到回车
-  line,err := tc.reader.ReadString('\n')
-	tc.err = err
-	if err !=nil {
-		if err == io.EOF {
-			slog.Debug("client shutdown")
-			return
+// 读取网络传送来的命令，分开用户命令和IAC命令
+func (tc *TelnetConn) startReading() {
+	for {
+		//从连接中读取信息，直到收到回车
+		line, err := tc.reader.ReadString('\n')
+		tc.err = err
+		if err != nil {
+			if err == io.EOF {
+				slog.Debug("client shutdown")
+				return
+			}
+			slog.Debug("read network error:", "error", err)
 		}
-		slog.Debug("read network error:","error",err)
-	}
-	//看看当前是否已经收到了IAC命令，如果是，命令的开头
-	userCmd := filterCommand(line)
-	tc.cmd <- userCmd
+		//看看当前是否已经收到了IAC命令，如果是，命令的开头
+		userCmd := filterCommand(line)
+		tc.cmd <- userCmd
 	}
 }
 
 func filterCommand(cmd string) string {
 	//去掉末尾的回车换行
-	cmd = strings.TrimRight(cmd,"\r\n")
+	cmd = strings.TrimRight(cmd, "\r\n")
 	c := []byte(cmd)
-	ret := make([]byte,0)
-	for i:=0;i<len(c);{
+	ret := make([]byte, 0)
+	for i := 0; i < len(c); {
 		if c[i] == IAC {
 			//判断是否是字面量255
 			if i+1 < len(c) && c[i+1] == IAC {
 				ret = append(ret, IAC)
-				i = i+2
+				i = i + 2
 				continue
 			}
 			//开始处理IAC命令
-			if i+1 < len(c){
-				switch c[i+1]{
-					case WILL,WONT,DO,DONT:
-						i = i+3
-					case SB:
-						for ;i<len(c);{
-							i++
-							if c[i]==SE{
-								break
-							}
+			if i+1 < len(c) {
+				switch c[i+1] {
+				case WILL, WONT, DO, DONT:
+					i = i + 3
+				case SB:
+					for i < len(c) {
+						i++
+						if c[i] == SE {
+							break
 						}
+					}
 				}
 			}
 			continue
 		}
-		ret = append(ret,c[i])
+		ret = append(ret, c[i])
 		i++
 	}
 	return string(ret)
@@ -152,20 +160,20 @@ func filterCommand(cmd string) string {
 // 实现接口：读取一行（去掉 \r\n）
 func (tc *TelnetConn) ReadLine() (string, error) {
 	cmd := <-tc.cmd
-	return cmd,tc.err
+	return cmd, tc.err
 	/*
-	line, err := tc.reader.ReadString('\n')
-	slog.Debug("readline"," got",line)
-	if err != nil {
-		return "", err
-	}
-	if len(line) > 0 && line[len(line)-1] == '\n' {
-		line = line[:len(line)-1]
-	}
-	if len(line) > 0 && line[len(line)-1] == '\r' {
-		line = line[:len(line)-1]
-	}
-	return line, nil
+		line, err := tc.reader.ReadString('\n')
+		slog.Debug("readline"," got",line)
+		if err != nil {
+			return "", err
+		}
+		if len(line) > 0 && line[len(line)-1] == '\n' {
+			line = line[:len(line)-1]
+		}
+		if len(line) > 0 && line[len(line)-1] == '\r' {
+			line = line[:len(line)-1]
+		}
+		return line, nil
 	*/
 }
 
@@ -215,15 +223,15 @@ func (tc *TelnetConn) IsEcho() bool {
 	return atomic.LoadInt32(&tc.echo) == 1
 }
 
-func (tc * TelnetConn) EnableLineMode() {
-// IAC DO LINEMODE
+func (tc *TelnetConn) EnableLineMode() {
+	// IAC DO LINEMODE
 	tc.raw.Write([]byte{IAC, DO, LINEMODE})
-	
+
 	// 同时请求回显由客户端处理（减少服务器负担）
 	// IAC WILL ECHO
 	//tc.raw.Write([]byte{IAC, WILL, 1}) // 1 = ECHO
 }
 
-func (tc * TelnetConn) DisableLineMode() {
+func (tc *TelnetConn) DisableLineMode() {
 
 }
