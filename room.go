@@ -243,8 +243,7 @@ func (r *Room) Enter(player *Player) {
 }
 
 func (r *Room) Leave(player *Player) {
-	r.Mutex.RLock()
-	defer r.Mutex.RUnlock()
+	r.Mutex.Lock()
 
 	for i, u := range r.Players {
 		if u.NickName == player.NickName {
@@ -253,6 +252,7 @@ func (r *Room) Leave(player *Player) {
 			break
 		}
 	}
+	r.Mutex.Unlock()
 
 	player.Mutex.Lock()
 	player.Room = nil
