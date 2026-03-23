@@ -3,6 +3,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 )
@@ -18,7 +19,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-func (c *Client) Chat(messages []Message) (string, error) {
+func (c *Client) Chat(ctx context.Context, messages []Message) (string, error) {
 	body := map[string]interface{}{
 		"model":    c.Model,
 		"messages": messages,

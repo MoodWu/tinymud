@@ -54,10 +54,15 @@ func NewWorld(aiClient *ai.Client) *World {
 		GlobalTick: make(chan struct{}, 100),
 	}
 
+	aiService := &ai.AIService{
+		Client: aiClient,
+		Sem:    make(chan struct{}, 3), // 最多3个并发AI请求
+	}
+
 	merchant := &npc.NPC{
 		Name:        "merchant",
 		Personality: "a greedy medieval merchant who loves gold",
-		Client:      aiClient,
+		Service:     aiService,
 		Memory:      make(map[string]*npc.Memory),
 	}
 
