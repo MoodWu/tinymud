@@ -58,6 +58,7 @@ func (p *Player) Read(ctx context.Context) {
 				cmd := Command{}
 				cmd.Parse(str)
 				cmd.Player = p
+				slog.Debug("player read command", "cmd", cmd.Raw)
 				world.Commands <- &cmd
 			}
 		}

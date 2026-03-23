@@ -1,8 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"game/ai"
+	"game/npc"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -32,6 +36,7 @@ type World struct {
 	DefaultRoom *Room
 	CommandMap  map[string]CommandFunc
 	GlobalTick  chan struct{}
+	NPCs        map[string]*npc.NPC
 }
 
 // var defaultRoom *Room
@@ -41,20 +46,49 @@ type World struct {
 // var globalTick chan struct{}
 var world *World
 
-func NewWorld() *World {
-	return &World{
+func NewWorld(aiClient *ai.Client) *World {
+	w := &World{
 		Commands:   make(chan *Command, 100),
 		RoomMap:    make(map[string]*Room, 0),
 		CommandMap: make(map[string]CommandFunc, 0),
 		GlobalTick: make(chan struct{}, 100),
 	}
+
+	merchant := &npc.NPC{
+		Name:        "merchant",
+		Personality: "a greedy medieval merchant who loves gold",
+		Client:      aiClient,
+	}
+
+	w.NPCs = map[string]*npc.NPC{
+		"merchant": merchant,
+	}
+	return w
 }
 func main() {
+	apiKeyFlag := flag.String("api-key", "", "LLM API Key")
+	flag.Parse()
+
+	// 2️⃣ 环境变量兜底
+	apiKey := *apiKeyFlag
+	if apiKey == "" {
+		apiKey = os.Getenv("LLM_API_KEY")
+	}
+
+	if apiKey == "" {
+		log.Fatal("API key is required (use --api-key or set LLM_API_KEY)")
+	}
+
+	aiClient := &ai.Client{
+		APIKey: apiKey,
+		URL:    "https://api.deepseek.com/chat/completions",
+		Model:  "deepseek-chat",
+	}
 	opts := &slog.HandlerOptions{Level: slog.LevelDebug}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, opts)))
 	slog.Info("Start MuD Service")
 
-	world = NewWorld()
+	world = NewWorld(aiClient)
 
 	globalContext, cancel := context.WithCancel(context.Background())
 
@@ -69,6 +103,8 @@ func main() {
 	go StartTelnetServer(globalContext, ":4001")
 	//Start clock tick
 	go StartTick(globalContext)
+
+	go world.Run(globalContext)
 
 	// 等待信号
 	sig := <-sigChan
@@ -184,6 +220,7 @@ func (w *World) Run(ctx context.Context) {
 	for {
 		select {
 		case cmd := <-w.Commands:
+			slog.Debug("world receive command", "command", cmd.Raw)
 			HandleCommand(ctx, cmd)
 		case <-ctx.Done():
 			slog.Info("Received quit signal, shutting down...")

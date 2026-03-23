@@ -111,13 +111,13 @@ func (r *Room) HandleCommand(cmd *Command) {
 	switch cmd.Verb {
 	case "go":
 		slog.Debug("go command")
-		r.Move(cmd.Player, cmd.Args)
+		r.Move(cmd.Player, cmd.Args[0])
 	case "look":
 		slog.Debug("look command")
 		r.Look(cmd.Player)
 	case "get":
 		slog.Debug("get command")
-		r.Get(cmd.Player, cmd.Args)
+		r.Get(cmd.Player, cmd.Args[0])
 	default:
 		slog.Debug("default handler")
 	}

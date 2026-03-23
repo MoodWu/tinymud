@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
+
 	// "log/slog"
 	"context"
 	//"errors"
@@ -11,7 +13,7 @@ import (
 type Command struct {
 	Player *Player
 	Verb   string
-	Args   string
+	Args   []string
 	Raw    string
 }
 
@@ -27,7 +29,7 @@ type CommandFunc func(context context.Context, cmd *Command) (error, CommandResu
 func (c *Command) Parse(value string) {
 	cmds := strings.Split(value, " ")
 	c.Verb = cmds[0]
-	c.Args = strings.Join(cmds[1:], " ")
+	c.Args = cmds[1:]
 	c.Raw = value
 }
 
@@ -67,4 +69,42 @@ func LookFunc(context context.Context, cmd *Command) (error, CommandResult) {
 
 func GetFunc(context context.Context, cmd *Command) (error, CommandResult) {
 	return GeneralCommandFunc(context, cmd, "get", "there's nothing to get ")
+}
+
+func TalkFunc(ctx context.Context, cmd *Command) (error, CommandResult) {
+	slog.Debug("TalkFunc called with command:", "cmd", cmd.Raw)
+
+	if len(cmd.Args) < 2 {
+		return nil, CommandResult{
+			Msg: "Usage: talk <npc> <message>",
+		}
+	}
+
+	npcName := cmd.Args[0]
+	input := cmd.Args[1]
+
+	n, ok := world.NPCs[npcName]
+	if !ok {
+		return nil, CommandResult{
+			Msg: "No such NPC",
+		}
+	}
+
+	player := cmd.Player // 假设你有
+
+	// ⭐ 核心：异步AI调用
+	go func() {
+		reply, err := n.Talk(input)
+		if err != nil {
+			player.Notify <- &CommandResult{0, "NPC is silent..."}
+			return
+		}
+
+		player.Notify <- &CommandResult{0, fmt.Sprintf("%s says: %s", npcName, reply)}
+	}()
+
+	// 立即返回（避免阻塞）
+	return nil, CommandResult{
+		Msg: "...",
+	}
 }
