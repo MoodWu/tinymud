@@ -23,6 +23,7 @@ type Player struct {
 	Ticker        chan struct{}
 	Inventory     map[string]*Inventory
 	Mutex         sync.RWMutex
+	TalkingNPC    string
 }
 
 func NewPlayer(ctx context.Context, nickName string, room *Room, conn ProtocolConn) *Player {
@@ -56,7 +57,20 @@ func (p *Player) Read(ctx context.Context) {
 					break
 				}
 				cmd := Command{}
-				cmd.Parse(str)
+
+				if p.TalkingNPC != "" {
+					if str == "bye" {
+						p.Notify <- &CommandResult{0, "You end the conversation with " + p.TalkingNPC}
+						p.TalkingNPC = ""
+						continue
+					} else {
+						cmd.Verb = "talk"
+						cmd.Args = []string{p.TalkingNPC, str}
+						cmd.Raw = "talk " + p.TalkingNPC + " " + str
+					}
+				} else {
+					cmd.Parse(str)
+				}
 				cmd.Player = p
 				slog.Debug("player read command", "cmd", cmd.Raw)
 				world.Commands <- &cmd

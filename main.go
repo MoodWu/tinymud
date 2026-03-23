@@ -58,6 +58,7 @@ func NewWorld(aiClient *ai.Client) *World {
 		Name:        "merchant",
 		Personality: "a greedy medieval merchant who loves gold",
 		Client:      aiClient,
+		Memory:      make(map[string]*npc.Memory),
 	}
 
 	w.NPCs = map[string]*npc.NPC{

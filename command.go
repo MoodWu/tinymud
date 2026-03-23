@@ -91,10 +91,10 @@ func TalkFunc(ctx context.Context, cmd *Command) (error, CommandResult) {
 	}
 
 	player := cmd.Player // 假设你有
-
+	player.TalkingNPC = npcName
 	// ⭐ 核心：异步AI调用
 	go func() {
-		reply, err := n.Talk(input)
+		reply, err := n.Talk(player.ID, input)
 		if err != nil {
 			player.Notify <- &CommandResult{0, "NPC is silent..."}
 			return
