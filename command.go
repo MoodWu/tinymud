@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"game/metrics"
 	"log/slog"
+	"time"
 
 	// "log/slog"
 	"context"
@@ -94,8 +96,13 @@ func TalkFunc(ctx context.Context, cmd *Command) (error, CommandResult) {
 	player.TalkingNPC = npcName
 	// ⭐ 核心：异步AI调用
 	go func() {
+		start := time.Now()
+		metrics.AICallTotal.Inc()
 		reply, err := n.Talk(ctx, player.ID, input)
+		duration := time.Since(start).Seconds()
+		metrics.AILatency.Observe(duration)
 		if err != nil {
+			metrics.AIErrorTotal.Inc()
 			player.Notify <- &CommandResult{0, "NPC is silent..."}
 			return
 		}

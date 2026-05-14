@@ -20,6 +20,7 @@ type Message struct {
 }
 
 func (c *Client) Chat(ctx context.Context, messages []Message) (string, error) {
+
 	body := map[string]interface{}{
 		"model":    c.Model,
 		"messages": messages,

@@ -16,8 +16,12 @@ import (
 	//"errors"
 	//"strings"
 	"context"
+	"game/metrics"
+	"net/http"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type ProtocolConn interface {
@@ -95,6 +99,15 @@ func main() {
 	slog.Info("Start MuD Service")
 
 	world = NewWorld(aiClient)
+
+	// 初始化指标
+	metrics.Init()
+
+	// 启动metrics服务
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":2112", nil)
+	}()
 
 	globalContext, cancel := context.WithCancel(context.Background())
 

@@ -19,3 +19,7 @@ bin/
 *.obj
 # Logs
 *.log
+
+# Monitor data directories
+moniter/prometheus-data/
+moniter/grafana-data/
